@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="수학과 컴퓨터과학을 무작위 문제, 단계별 힌트와 오답 복습으로 공부하세요."
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <title>THINK FORGE — 수학·컴퓨터과학 트레이닝</title>
+    <link rel="icon" href="./favicon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./src/app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#question">문제로 바로가기</a>
+    <header class="top">
+      <a class="brand" href="./"
+        >THINK<span>FORGE</span><small>생각을 단련하는 곳</small></a
+      >
+      <div class="top-actions">
+        <span id="level-badge">LEVEL 1</span
+        ><button id="daily">오늘의 도전</button
+        ><a href="https://github.com/HyungminYoon1/think-forge">소스 코드</a>
+      </div>
+    </header>
+    <main class="workspace">
+      <aside class="sidebar">
+        <p class="eyebrow">YOUR LEARNING PATH</p>
+        <h1>무엇을 풀까요?</h1>
+        <div class="subjects">
+          <button data-subject="math" aria-pressed="true">수학</button
+          ><button data-subject="cs" aria-pressed="false">컴퓨터과학</button>
+        </div>
+        <label for="topic">학습 범주</label
+        ><select id="topic">
+          <option value="numbers">수와 연산</option></select
+        ><label for="difficulty">문제 난이도</label
+        ><select id="difficulty">
+          <option value="1">1 · 입문</option>
+          <option value="2">2 · 기본</option>
+          <option value="3">3 · 응용</option>
+          <option value="4">4 · 도전</option>
+        </select>
+        <p class="eyebrow space">PLAY YOUR WAY</p>
+        <div class="modes">
+          <button data-mode="learn" aria-pressed="true">
+            차근차근 학습<span>힌트와 풀이를 함께</span></button
+          ><button data-mode="challenge" aria-pressed="false">
+            10문제 도전<span>3분 안에 얼마나 풀까요?</span></button
+          ><button data-mode="review" aria-pressed="false">
+            오답 다시 풀기<span id="review-count">기록된 오답 0개</span>
+          </button>
+        </div>
+        <label for="seed">도전 코드</label>
+        <div class="seed-row">
+          <input id="seed" maxlength="40" aria-describedby="seed-help" /><button
+            id="apply-seed"
+          >
+            적용
+          </button>
+        </div>
+        <small id="seed-help"
+          >같은 코드·범주·난이도는 같은 문제를 만듭니다.</small
+        ><button id="new-session" class="new-session">새 문제로 시작</button>
+      </aside>
+      <section class="study">
+        <div class="study-top">
+          <span id="breadcrumb">수학 / 수와 연산 / 입문</span
+          ><span id="session-label">학습 모드</span>
+        </div>
+        <div class="progress-track"><div id="progress"></div></div>
+        <article id="question" class="question-card" tabindex="-1">
+          <div class="question-meta">
+            <span id="question-kind">NUMBER SENSE</span
+            ><span id="question-number">QUESTION 01</span>
+          </div>
+          <h2 id="question-title">미지수의 값을 찾아보세요.</h2>
+          <div id="question-visual" class="question-visual"></div>
+          <p id="question-text" class="question-text">7x + 3 = 52</p>
+          <div id="choices" class="choices"></div>
+          <div id="numeric-answer" class="numeric-row">
+            <label for="answer">정답</label
+            ><input
+              id="answer"
+              inputmode="decimal"
+              autocomplete="off"
+              maxlength="40"
+              placeholder="값을 입력하세요"
+            /><button id="submit" class="primary">정답 확인</button>
+          </div>
+          <p id="feedback" role="status" class="feedback">
+            서두르지 않아도 괜찮아요. 생각부터 해보세요.
+          </p>
+          <div class="question-actions">
+            <button id="hint">힌트 보기</button
+            ><button id="skip">건너뛰기</button
+            ><button id="next" class="primary" hidden>다음 문제</button>
+          </div>
+          <section id="hint-panel" class="hint-panel" hidden></section>
+          <section id="explanation" class="explanation" hidden>
+            <p class="eyebrow">LET'S BREAK IT DOWN</p>
+            <h3>이렇게 풀어요.</h3>
+            <ol id="steps"></ol>
+          </section>
+        </article>
+        <section id="session-result" class="session-result" hidden></section>
+        <p id="notice" class="notice" role="status"></p>
+      </section>
+      <aside class="scoreboard">
+        <p class="eyebrow">SMALL STEPS, REAL PROGRESS</p>
+        <h2>내 학습 기록</h2>
+        <div class="score-big">
+          <strong id="correct-count">0</strong><span>이번 세션 정답</span>
+        </div>
+        <dl>
+          <div>
+            <dt>푼 문제</dt>
+            <dd id="total-count">0</dd>
+          </div>
+          <div>
+            <dt>연속 정답</dt>
+            <dd id="streak-count">0</dd>
+          </div>
+          <div>
+            <dt>누적 경험치</dt>
+            <dd id="xp-count">0 XP</dd>
+          </div>
+        </dl>
+        <div class="topic-progress">
+          <h3>범주별 진행</h3>
+          <div id="topic-progress"></div>
+        </div>
+        <div class="storage-note">
+          <strong>이 브라우저의 내 기록</strong>
+          <p>계정이나 서버로 전송하지 않습니다.</p>
+          <button id="export">기록 내보내기</button
+          ><button id="clear">기록 삭제</button>
+        </div>
+      </aside>
+    </main>
+    <footer>
+      <span>THINK FORGE / SOLVE. UNDERSTAND. REPEAT.</span
+      ><a href="https://hyungminyoon1.github.io/sense-lab/">SENSE LAB</a>
+    </footer>
+  </body>
+</html>
