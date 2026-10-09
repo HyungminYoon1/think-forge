@@ -38,20 +38,26 @@
         </div>
         <label for="topic">학습 범주</label
         ><select id="topic">
-          <option value="numbers">수와 연산</option></select
+          <option value="math-mix">수학 전체 · 혼합 출제</option></select
         ><label for="difficulty">문제 난이도</label
         ><select id="difficulty">
-          <option value="1">1 · 입문</option>
-          <option value="2">2 · 기본</option>
-          <option value="3">3 · 응용</option>
-          <option value="4">4 · 도전</option>
+          <option value="1">1 · 단계 안내</option>
+          <option value="2">2 · 독립 추론</option>
+          <option value="3">3 · 복합 조건 안내</option>
+          <option value="4" selected>4 · 복합 조건 독립 풀이</option>
         </select>
+        <p class="difficulty-help">
+          1·2단계도 여러 조건을 연결합니다. 3·4단계는 추가 제약·역추론·증명을
+          다룹니다. 홀수 단계에는 풀이 출발점을 제공합니다.
+        </p>
         <p class="eyebrow space">PLAY YOUR WAY</p>
         <div class="modes">
           <button data-mode="learn" aria-pressed="true">
             차근차근 학습<span>힌트와 풀이를 함께</span></button
           ><button data-mode="challenge" aria-pressed="false">
-            10문제 도전<span>3분 안에 얼마나 풀까요?</span></button
+            10문제 도전<span id="challenge-help"
+              >현재 단계 40분 · 종료 후 전체 풀이</span
+            ></button
           ><button data-mode="review" aria-pressed="false">
             오답 다시 풀기<span id="review-count">기록된 오답 0개</span>
           </button>
@@ -65,32 +71,38 @@
           </button>
         </div>
         <small id="seed-help"
-          >같은 코드·범주·난이도는 같은 문제를 만듭니다.</small
+          >은행 v2 · 같은 버전·코드·범주·단계는 같은 문제를 만듭니다. 기존
+          오답은 v1로 복원합니다.</small
         ><button id="new-session" class="new-session">새 문제로 시작</button>
       </aside>
       <section class="study">
         <div class="study-top">
-          <span id="breadcrumb">수학 / 수와 연산 / 입문</span
-          ><span id="session-label">학습 모드</span>
+          <span id="breadcrumb"
+            >수학 / 수학 전체 · 혼합 출제 / 4 · 복합 조건 독립 풀이</span
+          ><span id="session-label">학습 모드 · 은행 v2</span>
         </div>
         <div class="progress-track"><div id="progress"></div></div>
         <article id="question" class="question-card" tabindex="-1">
           <div class="question-meta">
-            <span id="question-kind">NUMBER SENSE</span
+            <span id="question-kind">수학 전체 · 혼합 출제</span
             ><span id="question-number">QUESTION 01</span>
           </div>
-          <h2 id="question-title">미지수의 값을 찾아보세요.</h2>
+          <h2 id="question-title">복합 조건 문제를 준비하고 있습니다.</h2>
           <div id="question-visual" class="question-visual"></div>
-          <p id="question-text" class="question-text">7x + 3 = 52</p>
+          <p id="question-text" class="question-text"></p>
+          <details class="source-details">
+            <summary>제작·출처·이용 조건</summary>
+            <div id="question-source" class="question-source"></div>
+          </details>
           <div id="choices" class="choices"></div>
           <div id="numeric-answer" class="numeric-row">
             <label for="answer">정답</label
             ><input
               id="answer"
-              inputmode="decimal"
+              inputmode="text"
               autocomplete="off"
               maxlength="40"
-              placeholder="값을 입력하세요"
+              placeholder="정수·분수 (예: 2/13)"
             /><button id="submit" class="primary">정답 확인</button>
           </div>
           <p id="feedback" role="status" class="feedback">
@@ -137,7 +149,10 @@
         </div>
         <div class="storage-note">
           <strong>이 브라우저의 내 기록</strong>
-          <p>계정이나 서버로 전송하지 않습니다.</p>
+          <p>
+            계정이나 서버로 전송하지 않습니다. 최대 200개 오답을 보관하며
+            한도에서 기존 기록을 자동 삭제하지 않습니다.
+          </p>
           <button id="export">기록 내보내기</button
           ><button id="clear">기록 삭제</button>
         </div>
@@ -145,7 +160,10 @@
     </main>
     <footer>
       <span>THINK FORGE / SOLVE. UNDERSTAND. REPEAT.</span
-      ><a href="https://hyungminyoon1.github.io/sense-lab/">SENSE LAB</a>
+      ><span
+        ><a href="./content-license.html">문항 출처·라이선스</a> ·
+        <a href="https://hyungminyoon1.github.io/sense-lab/">SENSE LAB</a></span
+      >
     </footer>
   </body>
 </html>

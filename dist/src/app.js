@@ -7,7 +7,17 @@ import {
   announce,
   tool,
 } from "./core.js";
-import { TOPICS, makeQuestion, answerMatches } from "./questions.js";
+import {
+  TOPICS,
+  makeQuestion,
+  answerMatches,
+  BANK_VERSION,
+  LEVELS,
+  challengeMinutes,
+  validConfig,
+  replay,
+  updateMistakes,
+} from "./bank.js";
 const KEY = "think-forge-v1";
 const blank = () => ({
   xp: 0,
@@ -29,34 +39,23 @@ if (
   record.correct = Math.max(0, Number(saved.correct) || 0);
   record.topics =
     saved.topics && typeof saved.topics === "object" ? saved.topics : {};
-  record.mistakes = saved.mistakes
-    .filter(
-      (v) =>
-        v &&
-        TOPICS[v.topic] &&
-        Number.isInteger(v.level) &&
-        v.level >= 1 &&
-        v.level <= 4 &&
-        typeof v.seed === "string" &&
-        v.seed.length <= 40 &&
-        Number.isInteger(v.index) &&
-        v.index >= 0,
-    )
-    .slice(-200);
+  // Preserve all prior data, including unsupported records for export/recovery.
+  record.mistakes = saved.mistakes;
 }
 let subject = "math",
-  topic = "numbers",
-  level = 1,
+  topic = "math-mix",
+  level = 4,
   mode = "learn",
   seed = freshSeed(),
   index = 0,
   current,
   answered = false,
   hintIndex = 0,
-  session = { total: 0, correct: 0, streak: 0 },
+  session = { total: 0, correct: 0, streak: 0, answers: [] },
   timer = 0,
   finished = false,
-  reviewQueue = [];
+  reviewQueue = [],
+  deadline = 0;
 function persist() {
   if (!saveLocal(KEY, record))
     announce("기록을 저장할 수 없습니다. 이번 세션은 계속 진행할 수 있습니다.");
@@ -81,7 +80,11 @@ function stats() {
   $("xp-count").textContent = record.xp + " XP";
   $("level-badge").textContent = "LEVEL " + (1 + Math.floor(record.xp / 100));
   $("review-count").textContent =
-    "기록된 오답 " + record.mistakes.length + "개";
+    "복습 가능 " +
+    record.mistakes.filter(validConfig).length +
+    "개 · 보관 " +
+    record.mistakes.length +
+    "개";
   $("topic-progress").replaceChildren(
     ...Object.keys(TOPICS)
       .filter((t) => record.topics[t]?.total)
@@ -98,8 +101,7 @@ function stats() {
       }),
   );
 }
-function visual(v) {
-  const el = $("question-visual");
+function visual(v, el = $("question-visual")) {
   el.replaceChildren();
   if (!v) return;
   if (v.type === "table") {
@@ -270,6 +272,29 @@ function visual(v) {
   }
   el.append(svg);
 }
+function provenance(container, question) {
+  container.replaceChildren();
+  const src = question.source;
+  const label = document.createElement("p");
+  label.textContent = `은행 v${question.bankVersion} · ${question.family} · ${src.creator} · ${src.title}${src.question ? " · " + src.question : ""}`;
+  container.append(label);
+  const note = document.createElement("p");
+  note.textContent = src.notice;
+  container.append(note);
+  for (const [title, url] of [
+    ["원문", src.url],
+    ["원문 해설", src.solutionUrl],
+    [src.license, src.licenseUrl],
+  ]) {
+    if (!url) continue;
+    const a = document.createElement("a");
+    a.href = url;
+    a.textContent = title;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    container.append(a);
+  }
+}
 function show() {
   answered = false;
   hintIndex = 0;
@@ -280,19 +305,26 @@ function show() {
       finish("오답 복습을 마쳤습니다.");
       return;
     }
-    current = makeQuestion(item.topic, item.level, item.seed, item.index);
+    current = replay(item);
   } else current = makeQuestion(topic, level, seed, index);
-  $("seed").value = seed;
+  $("seed").value = current.seed;
   $("breadcrumb").textContent =
     (TOPICS[current.topic].subject === "math" ? "수학" : "컴퓨터과학") +
     " / " +
     TOPICS[current.topic].name +
     " / " +
-    ["", "입문", "기본", "응용", "도전"][current.level];
-  $("question-kind").textContent = TOPICS[current.topic].name;
+    (current.bankVersion === 1
+      ? ["", "입문 (기존)", "기본 (기존)", "응용 (기존)", "도전 (기존)"][
+          current.level
+        ]
+      : LEVELS[current.level]);
+  $("question-kind").textContent =
+    TOPICS[current.topic].name +
+    (current.source.kind === "adapted" ? " · 출처 번안" : " · 자체 제작");
   $("question-number").textContent =
     "QUESTION " + String(index + 1).padStart(2, "0");
   $("question-title").textContent = current.title;
+  provenance($("question-source"), current);
   $("question-text").textContent = current.text;
   $("question-text").classList.toggle("code", current.code);
   visual(current.visual);
@@ -338,6 +370,10 @@ function show() {
 }
 function answer(value) {
   if (answered || finished) return;
+  if (mode === "challenge" && Date.now() >= deadline) {
+    finish("도전 시간이 끝났습니다.");
+    return;
+  }
   if (value !== null && (!String(value).trim() || String(value).length > 80)) {
     announce("정답을 먼저 입력하세요.");
     return;
@@ -348,6 +384,12 @@ function answer(value) {
   session.total++;
   session.correct += correct ? 1 : 0;
   session.streak = correct ? session.streak + 1 : 0;
+  session.answers.push({
+    question: current,
+    value,
+    correct,
+    status: value === null ? "건너뜀" : correct ? "정답" : "오답",
+  });
   record.answered++;
   record.correct += correct ? 1 : 0;
   record.xp += correct ? 10 + current.level * 3 : 2;
@@ -355,28 +397,23 @@ function answer(value) {
   t.total++;
   t.correct += correct ? 1 : 0;
   record.topics[current.topic] = t;
-  const item = {
-      topic: current.topic,
-      level: current.level,
-      seed: current.seed,
-      index: current.index,
-    },
-    same = (m) =>
-      m.topic === item.topic &&
-      m.level === item.level &&
-      m.seed === item.seed &&
-      m.index === item.index;
-  if (correct) record.mistakes = record.mistakes.filter((m) => !same(m));
-  else if (!record.mistakes.some(same)) record.mistakes.push(item);
-  record.mistakes = record.mistakes.slice(-200);
+  if (!correct && record.mistakes.length >= 200)
+    announce(
+      "오답 보관 한도 200개입니다. 기존 기록은 유지합니다. 내보내기 또는 복습 후 새 오답을 저장할 수 있습니다.",
+    );
+  record.mistakes = updateMistakes(record.mistakes, current, correct);
   persist();
-  $("feedback").className = "feedback " + (correct ? "correct" : "wrong");
-  $("feedback").textContent = correct
-    ? "정답입니다. 풀이도 확인해보세요."
-    : (value === null ? "건너뛰었습니다. " : "아쉬워요. ") +
-      "정답은 " +
-      current.answer +
-      "입니다.";
+  $("feedback").className =
+    "feedback " + (mode === "challenge" ? "" : correct ? "correct" : "wrong");
+  $("feedback").textContent =
+    mode === "challenge"
+      ? "답을 기록했습니다. 종료 후 정답과 풀이를 확인하세요."
+      : correct
+        ? "정답입니다. 풀이도 확인해보세요."
+        : (value === null ? "건너뛰었습니다. " : "아쉬워요. ") +
+          "정답은 " +
+          current.answer +
+          "입니다.";
   $("answer").disabled = true;
   $("submit").disabled = true;
   $("skip").disabled = true;
@@ -385,8 +422,11 @@ function answer(value) {
   for (const b of $("choices").children) {
     b.disabled = true;
     const v = b.querySelector("span").textContent;
-    b.classList.toggle("hit", answerMatches(v, current.answer));
-    b.classList.toggle("miss", !correct && v === value);
+    b.classList.toggle(
+      "hit",
+      mode !== "challenge" && answerMatches(v, current.answer),
+    );
+    b.classList.toggle("miss", mode !== "challenge" && !correct && v === value);
   }
   $("steps").replaceChildren(
     ...current.steps.map((s) =>
@@ -401,6 +441,7 @@ function answer(value) {
     finish("10문제 도전을 마쳤습니다.");
 }
 function finish(title) {
+  if (finished) return;
   finished = true;
   clearInterval(timer);
   timer = 0;
@@ -423,11 +464,52 @@ function finish(title) {
     record.xp +
     " XP";
   $("session-result").append(h, n, p);
+  if (mode === "challenge") {
+    const count = document.createElement("p");
+    count.textContent = `전체 10문제 중 제출 ${session.total} · 정답 ${session.correct}/10 · 미제출 ${10 - session.total}. 제출 문항 정답률은 위에 표시합니다.`;
+    $("session-result").append(count);
+    const entries = [...session.answers];
+    // Include the timed-out current question and all unseen questions, without scoring them as mistakes.
+    for (let i = session.total; i < 10; i++)
+      entries.push({
+        question: makeQuestion(topic, level, seed, i),
+        value: null,
+        correct: false,
+        status: "미제출",
+      });
+    for (const [i, entry] of entries.entries()) {
+      const details = document.createElement("details"),
+        summary = document.createElement("summary"),
+        text = document.createElement("p"),
+        result = document.createElement("p"),
+        steps = document.createElement("ol"),
+        credit = document.createElement("div");
+      summary.textContent = `${i + 1}. ${entry.status} · ${entry.question.title}`;
+      text.textContent = entry.question.text;
+      text.className = "review-text";
+      result.textContent = `내 답: ${entry.value ?? entry.status} / 정답: ${entry.question.answer}`;
+      steps.replaceChildren(
+        ...entry.question.steps.map((s) =>
+          Object.assign(document.createElement("li"), { textContent: s }),
+        ),
+      );
+      credit.className = "question-source";
+      provenance(credit, entry.question);
+      const diagram = document.createElement("div");
+      diagram.className = "question-visual";
+      // v2 review visuals are read-only data tables; no live answer controls.
+      if (entry.question.visual?.type === "table")
+        visual(entry.question.visual, diagram);
+      details.append(summary, text, diagram, result, steps, credit);
+      $("session-result").append(details);
+    }
+  }
   const button = document.createElement("button");
   button.textContent = "새 문제로 다시 도전";
   button.onclick = () => start(freshSeed());
   $("session-result").append(button);
   $("session-result").hidden = false;
+  $("question").hidden = true;
   $("session-label").textContent = "세션 완료";
   stats();
 }
@@ -437,8 +519,14 @@ function start(nextSeed = seed) {
   timer = 0;
   seed = validatedSeed;
   index = 0;
-  session = { total: 0, correct: 0, streak: 0 };
-  reviewQueue = [...record.mistakes];
+  finished = false;
+  session = { total: 0, correct: 0, streak: 0, answers: [] };
+  reviewQueue = record.mistakes.filter(validConfig);
+  deadline =
+    mode === "challenge" ? Date.now() + challengeMinutes(level) * 60000 : 0;
+  $("difficulty").value = String(level);
+  $("challenge-help").textContent =
+    `현재 단계 ${challengeMinutes(level)}분 · 종료 후 전체 풀이`;
   document
     .querySelectorAll("[data-subject]")
     .forEach((b) =>
@@ -457,9 +545,12 @@ function start(nextSeed = seed) {
   }
   show();
   $("session-label").textContent =
-    mode === "learn" ? "학습 모드" : mode === "review" ? "오답 복습" : "03:00";
+    mode === "learn"
+      ? "학습 모드 · 은행 v2"
+      : mode === "review"
+        ? "오답 복습 · 저장 당시 버전"
+        : `${challengeMinutes(level)}:00`;
   if (mode === "challenge") {
-    const deadline = Date.now() + 180000;
     timer = setInterval(() => {
       const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       $("session-label").textContent =
@@ -491,7 +582,7 @@ document.querySelectorAll("[data-subject]").forEach(
   (b) =>
     (b.onclick = () => {
       subject = b.dataset.subject;
-      topic = subject === "math" ? "numbers" : "logic";
+      topic = subject === "math" ? "math-mix" : "cs-mix";
       topics();
       start(freshSeed());
     }),
@@ -528,7 +619,12 @@ $("export").onclick = () => {
     new Blob(
       [
         JSON.stringify(
-          { version: 1, exportedAt: new Date().toISOString(), record },
+          {
+            version: 2,
+            currentBankVersion: BANK_VERSION,
+            exportedAt: new Date().toISOString(),
+            record,
+          },
           null,
           2,
         ),

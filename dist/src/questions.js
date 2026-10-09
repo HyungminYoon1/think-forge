@@ -49,6 +49,7 @@ export function answerMatches(input, answer) {
     ? Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b))
     : clean(input) === clean(answer);
 }
+// Frozen v1 bank: keep RNG call order and question semantics for saved mistakes.
 export function makeQuestion(topic, level, seed, index = 0) {
   if (
     !TOPICS[topic] ||
