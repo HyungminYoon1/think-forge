@@ -18,6 +18,9 @@ import {
   replay,
   updateMistakes,
 } from "./bank.js";
+import { reasoningCriteria, scoreReasoning } from "./reasoning.js";
+import { loadAchievements, recordAttempt, COMPLETION_TOTAL, EVIDENCE_LIMIT } from "./achievements.js";
+import { reportProgress, clearProgress } from "./progress.js";
 const KEY = "think-forge-v1";
 const blank = () => ({
   xp: 0,
@@ -25,6 +28,7 @@ const blank = () => ({
   correct: 0,
   topics: {},
   mistakes: [],
+  achievements: loadAchievements(null),
 });
 let saved = loadLocal(KEY, null),
   record = blank();
@@ -41,6 +45,7 @@ if (
     saved.topics && typeof saved.topics === "object" ? saved.topics : {};
   // Preserve all prior data, including unsupported records for export/recovery.
   record.mistakes = saved.mistakes;
+  record.achievements = loadAchievements(saved.achievements);
 }
 let subject = "math",
   topic = "math-mix",
@@ -51,14 +56,21 @@ let subject = "math",
   current,
   answered = false,
   hintIndex = 0,
+  aided = false,
+  reasoningInputs = [],
   session = { total: 0, correct: 0, streak: 0, answers: [] },
   timer = 0,
   finished = false,
   reviewQueue = [],
   deadline = 0;
-function persist() {
-  if (!saveLocal(KEY, record))
+function persist({ summarize = false } = {}) {
+  if (!saveLocal(KEY, record)) {
     announce("기록을 저장할 수 없습니다. 이번 세션은 계속 진행할 수 있습니다.");
+    return false;
+  }
+  if (summarize && record.achievements.families.length)
+    reportProgress(record.achievements.families.length, COMPLETION_TOTAL);
+  return true;
 }
 function topics() {
   $("topic").replaceChildren(
@@ -77,6 +89,7 @@ function stats() {
   $("correct-count").textContent = session.correct;
   $("total-count").textContent = session.total;
   $("streak-count").textContent = session.streak;
+  $("independent-count").textContent = record.achievements.families.length + " / " + COMPLETION_TOTAL;
   $("xp-count").textContent = record.xp + " XP";
   $("level-badge").textContent = "LEVEL " + (1 + Math.floor(record.xp / 100));
   $("review-count").textContent =
@@ -100,6 +113,38 @@ function stats() {
         return row;
       }),
   );
+}
+function renderReasoning() {
+  const criteria = reasoningCriteria(current);
+  reasoningInputs = [];
+  $("reasoning-panel").hidden = !criteria.length;
+  $("reasoning-panel").open = false;
+  $("reasoning-fields").replaceChildren();
+  $("reasoning-result").replaceChildren();
+  for (const c of criteria) {
+    const label = document.createElement("label"), input = document.createElement("input");
+    input.id = "reason-" + c.id;
+    input.maxLength = 40;
+    input.autocomplete = "off";
+    input.placeholder = "정수·분수·소수";
+    input.setAttribute("aria-label", c.label);
+    label.textContent = c.label;
+    label.setAttribute("for", input.id);
+    $("reasoning-fields").append(label, input);
+    reasoningInputs.push({ id: c.id, input });
+  }
+}
+function reasoningFeedback(score, container) {
+  container.replaceChildren();
+  if (!score.attempted) return;
+  const text = document.createElement("p"), list = document.createElement("ul");
+  text.textContent = `풀이 점검 ${score.earned}/${score.total} · 작성 ${score.attempted}/${score.total}`;
+  for (const r of score.results) {
+    const item = document.createElement("li");
+    item.textContent = `${r.label}: ${r.value || "미작성"} · ${r.correct ? "충족" : r.attempted ? "다시 확인" : "미작성"} · 기준값 ${r.answer}`;
+    list.append(item);
+  }
+  container.append(text, list);
 }
 function visual(v, el = $("question-visual")) {
   el.replaceChildren();
@@ -298,6 +343,7 @@ function provenance(container, question) {
 function show() {
   answered = false;
   hintIndex = 0;
+  aided = false;
   finished = false;
   if (mode === "review") {
     const item = reviewQueue[index];
@@ -307,6 +353,7 @@ function show() {
     }
     current = replay(item);
   } else current = makeQuestion(topic, level, seed, index);
+  renderReasoning();
   $("seed").value = current.seed;
   $("breadcrumb").textContent =
     (TOPICS[current.topic].subject === "math" ? "수학" : "컴퓨터과학") +
@@ -358,8 +405,8 @@ function show() {
   $("feedback").className = "feedback";
   $("feedback").textContent =
     mode === "challenge"
-      ? "시간 안에 정답을 골라보세요."
-      : "생각해보고 답을 입력하세요.";
+      ? "종료 후 정답과 풀이를 확인합니다."
+      : "";
   $("progress").style.width =
     (mode === "challenge"
       ? session.total * 10
@@ -381,6 +428,7 @@ function answer(value) {
   answered = true;
   const correct =
     value !== null && answerMatches(String(value), current.answer);
+  const reasoning = scoreReasoning(current, Object.fromEntries(reasoningInputs.map(({ id, input }) => [id, input.value])));
   session.total++;
   session.correct += correct ? 1 : 0;
   session.streak = correct ? session.streak + 1 : 0;
@@ -389,10 +437,17 @@ function answer(value) {
     value,
     correct,
     status: value === null ? "건너뜀" : correct ? "정답" : "오답",
+    reasoning,
   });
   record.answered++;
   record.correct += correct ? 1 : 0;
-  record.xp += correct ? 10 + current.level * 3 : 2;
+  record.xp = Math.min(1e9, record.xp + (correct ? 10 + current.level * 3 : 2));
+  const completedBefore = record.achievements.families.length;
+  record.achievements = recordAttempt(record.achievements, current, {
+    correct, aided: aided || $("reasoning-panel").open || reasoning.attempted > 0, review: mode === "review",
+  });
+  if (record.achievements.seen.length >= EVIDENCE_LIMIT)
+    announce("독립 완료 판정 한도 1,000개 조건입니다. XP·오답 기록은 계속 저장합니다.");
   const t = record.topics[current.topic] || { total: 0, correct: 0 };
   t.total++;
   t.correct += correct ? 1 : 0;
@@ -402,18 +457,20 @@ function answer(value) {
       "오답 보관 한도 200개입니다. 기존 기록은 유지합니다. 내보내기 또는 복습 후 새 오답을 저장할 수 있습니다.",
     );
   record.mistakes = updateMistakes(record.mistakes, current, correct);
-  persist();
+  persist({ summarize: record.achievements.families.length > completedBefore });
   $("feedback").className =
     "feedback " + (mode === "challenge" ? "" : correct ? "correct" : "wrong");
   $("feedback").textContent =
     mode === "challenge"
-      ? "답을 기록했습니다. 종료 후 정답과 풀이를 확인하세요."
+      ? value === null ? "건너뜀." : "답을 기록했습니다."
       : correct
-        ? "정답입니다. 풀이도 확인해보세요."
-        : (value === null ? "건너뛰었습니다. " : "아쉬워요. ") +
+        ? "정답입니다."
+        : (value === null ? "건너뜀. " : "오답. ") +
           "정답은 " +
           current.answer +
           "입니다.";
+  for (const { input } of reasoningInputs) input.disabled = true;
+  if (mode !== "challenge") reasoningFeedback(reasoning, $("reasoning-result"));
   $("answer").disabled = true;
   $("submit").disabled = true;
   $("skip").disabled = true;
@@ -451,22 +508,24 @@ function finish(title) {
   $("answer").disabled = true;
   $("hint").disabled = true;
   for (const b of $("choices").children) b.disabled = true;
+  for (const { input } of reasoningInputs) input.disabled = true;
   $("session-result").replaceChildren();
   const h = document.createElement("h2"),
     n = document.createElement("strong"),
     p = document.createElement("p");
   h.textContent = title;
-  n.textContent = session.correct + " / " + session.total;
+  const submitted = session.answers.filter((entry) => entry.value !== null).length;
+  n.textContent = session.correct + " / " + (mode === "challenge" ? 10 : session.total);
   p.textContent =
-    "정답률 " +
-    (session.total ? Math.round((session.correct / session.total) * 100) : 0) +
+    (mode === "challenge" ? "제출 답 정답률 " : "정답률 ") +
+    (submitted ? Math.round((session.correct / submitted) * 100) : 0) +
     "% · 누적 " +
     record.xp +
     " XP";
   $("session-result").append(h, n, p);
   if (mode === "challenge") {
     const count = document.createElement("p");
-    count.textContent = `전체 10문제 중 제출 ${session.total} · 정답 ${session.correct}/10 · 미제출 ${10 - session.total}. 제출 문항 정답률은 위에 표시합니다.`;
+    count.textContent = `제출 ${submitted} · 건너뜀 ${session.total - submitted} · 미제출 ${10 - session.total}`;
     $("session-result").append(count);
     const entries = [...session.answers];
     // Include the timed-out current question and all unseen questions, without scoring them as mistakes.
@@ -500,7 +559,14 @@ function finish(title) {
       // v2 review visuals are read-only data tables; no live answer controls.
       if (entry.question.visual?.type === "table")
         visual(entry.question.visual, diagram);
-      details.append(summary, text, diagram, result, steps, credit);
+      const analysis = document.createElement("div");
+      if (entry.reasoning) reasoningFeedback(entry.reasoning, analysis);
+      details.append(summary, text, diagram, result, analysis, steps, credit);
+      details.ontoggle = () => {
+        if (!details.open) return;
+        record.achievements = recordAttempt(record.achievements, entry.question, { aided: true });
+        persist();
+      };
       $("session-result").append(details);
     }
   }
@@ -574,9 +640,19 @@ $("next").onclick = () => {
 };
 $("hint").onclick = () => {
   if (answered || mode === "challenge") return;
+  markAided();
   $("hint-panel").hidden = false;
   $("hint-panel").textContent =
     current.hints[Math.min(hintIndex++, current.hints.length - 1)];
+};
+function markAided() {
+  if (answered || finished || aided) return;
+  aided = true;
+  record.achievements = recordAttempt(record.achievements, current, { aided: true });
+  persist();
+}
+$("reasoning-panel").ontoggle = () => {
+  if ($("reasoning-panel").open) markAided();
 };
 document.querySelectorAll("[data-subject]").forEach(
   (b) =>
@@ -646,9 +722,11 @@ $("clear").onclick = () => {
     )
   ) {
     record = blank();
-    persist();
+    // Only remove this service's summary; other services share the origin.
+    const stored = saveLocal(KEY, record);
+    const cleared = stored && clearProgress();
     start(freshSeed());
-    announce("이 브라우저의 기록을 삭제했습니다.");
+    announce(stored && cleared ? "기록을 삭제했습니다." : "일부 기록을 삭제하지 못했습니다. 브라우저 저장 설정을 확인하세요.");
   }
 };
 tool(

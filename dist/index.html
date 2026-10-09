@@ -20,7 +20,7 @@
     <a class="skip" href="#question">문제로 바로가기</a>
     <header class="top">
       <a class="brand" href="./"
-        >THINK<span>FORGE</span><small>생각을 단련하는 곳</small></a
+        >THINK<span>FORGE</span></a
       >
       <div class="top-actions">
         <span id="level-badge">LEVEL 1</span
@@ -30,8 +30,7 @@
     </header>
     <main class="workspace">
       <aside class="sidebar">
-        <p class="eyebrow">YOUR LEARNING PATH</p>
-        <h1>무엇을 풀까요?</h1>
+        <h1>수학·컴퓨터과학</h1>
         <div class="subjects">
           <button data-subject="math" aria-pressed="true">수학</button
           ><button data-subject="cs" aria-pressed="false">컴퓨터과학</button>
@@ -39,7 +38,7 @@
         <label for="topic">학습 범주</label
         ><select id="topic">
           <option value="math-mix">수학 전체 · 혼합 출제</option></select
-        ><label for="difficulty">문제 난이도</label
+        ><label for="difficulty">풀이 단계</label
         ><select id="difficulty">
           <option value="1">1 · 단계 안내</option>
           <option value="2">2 · 독립 추론</option>
@@ -47,19 +46,22 @@
           <option value="4" selected>4 · 복합 조건 독립 풀이</option>
         </select>
         <p class="difficulty-help">
-          1·2단계도 여러 조건을 연결합니다. 3·4단계는 추가 제약·역추론·증명을
-          다룹니다. 홀수 단계에는 풀이 출발점을 제공합니다.
+          1·3단계는 출발점 제공, 2·4단계는 독립 풀이.
+          3·4단계는 복합 조건을 다룹니다.
         </p>
-        <p class="eyebrow space">PLAY YOUR WAY</p>
+        <details class="onboarding">
+          <summary>사용 방법</summary>
+          <p>학습은 제출 직후 풀이를 확인합니다. 시험은 선택한 단계에서 10문제를 풀고 종료 후 복습합니다. 1·3단계의 출발점은 시험에도 포함되며 추가 힌트는 없습니다.</p>
+        </details>
         <div class="modes">
           <button data-mode="learn" aria-pressed="true">
-            차근차근 학습<span>힌트와 풀이를 함께</span></button
+            학습<span>제출 후 풀이</span></button
           ><button data-mode="challenge" aria-pressed="false">
-            10문제 도전<span id="challenge-help"
+            10문제 시험<span id="challenge-help"
               >현재 단계 40분 · 종료 후 전체 풀이</span
             ></button
           ><button data-mode="review" aria-pressed="false">
-            오답 다시 풀기<span id="review-count">기록된 오답 0개</span>
+            오답 복습<span id="review-count">오답 0개</span>
           </button>
         </div>
         <label for="seed">도전 코드</label>
@@ -71,8 +73,7 @@
           </button>
         </div>
         <small id="seed-help"
-          >은행 v2 · 같은 버전·코드·범주·단계는 같은 문제를 만듭니다. 기존
-          오답은 v1로 복원합니다.</small
+          >같은 코드·범주·단계는 같은 문제를 만듭니다.</small
         ><button id="new-session" class="new-session">새 문제로 시작</button>
       </aside>
       <section class="study">
@@ -87,7 +88,7 @@
             <span id="question-kind">수학 전체 · 혼합 출제</span
             ><span id="question-number">QUESTION 01</span>
           </div>
-          <h2 id="question-title">복합 조건 문제를 준비하고 있습니다.</h2>
+          <h2 id="question-title">문제 준비 중</h2>
           <div id="question-visual" class="question-visual"></div>
           <p id="question-text" class="question-text"></p>
           <details class="source-details">
@@ -95,6 +96,12 @@
             <div id="question-source" class="question-source"></div>
           </details>
           <div id="choices" class="choices"></div>
+          <details id="reasoning-panel" class="reasoning" hidden>
+            <summary>풀이 과정 입력 (선택)</summary>
+            <p>각 중간값이 기준과 같으면 1점입니다. 정답·XP와 별도로 점검하며, 기준을 열어 푼 문항은 독립 완료에 포함하지 않습니다.</p>
+            <div id="reasoning-fields"></div>
+            <div id="reasoning-result" role="status"></div>
+          </details>
           <div id="numeric-answer" class="numeric-row">
             <label for="answer">정답</label
             ><input
@@ -105,9 +112,7 @@
               placeholder="정수·분수 (예: 2/13)"
             /><button id="submit" class="primary">정답 확인</button>
           </div>
-          <p id="feedback" role="status" class="feedback">
-            서두르지 않아도 괜찮아요. 생각부터 해보세요.
-          </p>
+          <p id="feedback" role="status" class="feedback"></p>
           <div class="question-actions">
             <button id="hint">힌트 보기</button
             ><button id="skip">건너뛰기</button
@@ -115,8 +120,7 @@
           </div>
           <section id="hint-panel" class="hint-panel" hidden></section>
           <section id="explanation" class="explanation" hidden>
-            <p class="eyebrow">LET'S BREAK IT DOWN</p>
-            <h3>이렇게 풀어요.</h3>
+            <h3>풀이</h3>
             <ol id="steps"></ol>
           </section>
         </article>
@@ -124,7 +128,6 @@
         <p id="notice" class="notice" role="status"></p>
       </section>
       <aside class="scoreboard">
-        <p class="eyebrow">SMALL STEPS, REAL PROGRESS</p>
         <h2>내 학습 기록</h2>
         <div class="score-big">
           <strong id="correct-count">0</strong><span>이번 세션 정답</span>
@@ -142,6 +145,10 @@
             <dt>누적 경험치</dt>
             <dd id="xp-count">0 XP</dd>
           </div>
+          <div>
+            <dt>독립 완료 문제군</dt>
+            <dd id="independent-count">0 / 48</dd>
+          </div>
         </dl>
         <div class="topic-progress">
           <h3>범주별 진행</h3>
@@ -150,16 +157,20 @@
         <div class="storage-note">
           <strong>이 브라우저의 내 기록</strong>
           <p>
-            계정이나 서버로 전송하지 않습니다. 최대 200개 오답을 보관하며
-            한도에서 기존 기록을 자동 삭제하지 않습니다.
+            브라우저에 저장합니다. 오답 최대 200개, 기존 기록 자동 삭제 없음.
+            갤러리에는 독립 완료 수·전체 수·갱신 시각만 공유합니다.
           </p>
+          <details>
+            <summary>완료 기준</summary>
+            <p>2·4단계에서 처음 푼 조건을 힌트 없이 맞힌 문제군입니다. 풀이 기준을 열거나 오답 복습으로 푼 경우는 제외합니다. 판정 조건은 최대 1,000개 보관합니다.</p>
+          </details>
           <button id="export">기록 내보내기</button
           ><button id="clear">기록 삭제</button>
         </div>
       </aside>
     </main>
     <footer>
-      <span>THINK FORGE / SOLVE. UNDERSTAND. REPEAT.</span
+      <span>THINK FORGE</span
       ><span
         ><a href="./content-license.html">문항 출처·라이선스</a> ·
         <a href="https://hyungminyoon1.github.io/sense-lab/">SENSE LAB</a></span

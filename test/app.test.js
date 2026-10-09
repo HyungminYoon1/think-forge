@@ -3,6 +3,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { makeQuestion, replay } from "../dist/src/bank.js";
+import { reasoningCriteria } from "../dist/src/reasoning.js";
+import { recordAttempt } from "../dist/src/achievements.js";
+import { PROGRESS_KEY } from "../dist/src/progress.js";
 
 class Element {
   constructor(tag = "div") {
@@ -76,7 +79,7 @@ async function app(t, saved) {
   const intervals = new Map();
   let tick = 0,
     time = 2000000000000,
-    stored = saved ? JSON.stringify(saved) : null,
+    store = new Map(saved ? [["think-forge-v1", JSON.stringify(saved)]] : []),
     blob;
   const originals = {};
   const install = (key, v) => {
@@ -98,10 +101,9 @@ async function app(t, saved) {
           : [],
   });
   install("localStorage", {
-    getItem: () => stored,
-    setItem: (_, v) => {
-      stored = v;
-    },
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, v) => store.set(key, v),
+    removeItem: (key) => store.delete(key),
   });
   install("addEventListener", () => {});
   install("setInterval", (fn) => {
@@ -130,7 +132,8 @@ async function app(t, saved) {
   return {
     html,
     el: (id) => els.get(id),
-    record: () => (stored ? JSON.parse(stored) : null),
+    record: () => store.has("think-forge-v1") ? JSON.parse(store.get("think-forge-v1")) : null,
+    store,
     mode: (mode) => modes.find((b) => b.dataset.mode === mode).click(),
     topic: (value) => {
       els.get("topic").value = value;
@@ -140,8 +143,8 @@ async function app(t, saved) {
       els.get("difficulty").value = String(value);
       els.get("difficulty").onchange();
     },
-    seed: () => {
-      els.get("seed").value = "smoke";
+    seed: (value = "smoke") => {
+      els.get("seed").value = value;
       els.get("apply-seed").click();
     },
     answer: (value) => {
@@ -252,6 +255,7 @@ test("DOM double: ten-question challenge completes, reviews tables/answers/prove
   assert.ok(details.every((d) => d.textContent.includes("은행 v2")));
   assert.equal(a.intervals.size, 0);
   assert.equal(a.record().mistakes.length, 10);
+  assert.match(review.textContent, /제출 0 · 건너뜀 10 · 미제출 0/);
 });
 test("DOM double: submit after deadline cannot score; all unseen questions remain reviewable", async (t) => {
   const a = await app(t);
@@ -289,4 +293,131 @@ test("DOM double: capacity does not evict legacy mistakes and announces limit", 
   a.el("skip").click();
   assert.deepEqual(a.record().mistakes, mistakes);
   assert.match(a.el("notice").textContent, /기존 기록은 유지/);
+});
+
+test("DOM double: optional checkpoints have partial feedback and do not affect answer/XP or completion", async (t) => {
+  const a = await app(t);
+  a.topic("calculus"); a.seed();
+  const q = makeQuestion("calculus", 4, "smoke", 0);
+  assert.equal(q.family, "poster-optimum");
+  assert.equal(a.el("reasoning-panel").hidden, false);
+  a.el("reasoning-panel").open = true;
+  a.el("reasoning-panel").ontoggle();
+  const inputs = a.el("reasoning-fields").children.filter((el) => el.tagName === "input");
+  const criteria = reasoningCriteria(q);
+  inputs[0].value = criteria[0].answer;
+  inputs[1].value = "0";
+  a.answer(q.answer);
+  assert.match(a.el("reasoning-result").textContent, /풀이 점검 1\/2/);
+  assert.match(a.el("reasoning-result").textContent, /다시 확인/);
+  assert.equal(a.record().correct, 1);
+  assert.equal(a.record().xp, 22);
+  assert.equal(a.record().achievements.families.length, 0);
+  assert.ok(inputs.every((el) => el.disabled));
+  a.el("export").click();
+  assert.equal(JSON.stringify(await a.exported()).includes("reasoning"), false, "do not persist raw checkpoint inputs");
+  a.el("next").click();
+  assert.equal(a.el("reasoning-result").textContent, "");
+});
+
+test("DOM double: checkpoint success cannot turn a wrong final answer into a correct answer", async (t) => {
+  const a = await app(t);
+  a.topic("calculus"); a.seed();
+  const q = makeQuestion("calculus", 4, "smoke", 0);
+  const inputs = a.el("reasoning-fields").children.filter((el) => el.tagName === "input");
+  reasoningCriteria(q).forEach((c, i) => { inputs[i].value = c.answer; });
+  a.answer("0");
+  assert.match(a.el("reasoning-result").textContent, /풀이 점검 2\/2/);
+  assert.equal(a.record().correct, 0);
+  assert.equal(a.record().xp, 2);
+  assert.equal(a.record().mistakes.length, 1);
+});
+
+test("DOM double: exam checkpoint feedback waits for finish and submitted/skip/unsubmitted are distinct", async (t) => {
+  const a = await app(t);
+  a.topic("calculus"); a.mode("challenge"); a.seed();
+  const q = makeQuestion("calculus", 4, "smoke", 0);
+  const inputs = a.el("reasoning-fields").children.filter((el) => el.tagName === "input");
+  reasoningCriteria(q).forEach((c, i) => { inputs[i].value = c.answer; });
+  a.answer(q.answer);
+  assert.equal(a.el("reasoning-result").textContent, "");
+  assert.equal(a.el("explanation").hidden, true);
+  a.el("next").click(); a.el("skip").click();
+  a.advance(40 * 60000 + 1); a.tick();
+  assert.match(a.el("session-result").textContent, /제출 1 · 건너뜀 1 · 미제출 8/);
+  assert.match(a.el("session-result").textContent, /제출 답 정답률 100%/);
+  assert.match(a.el("session-result").textContent, /풀이 점검 2\/2/);
+});
+
+test("DOM double: actual independent answer saves minimal summary; initial/hint/replay never award", async (t) => {
+  const a = await app(t);
+  assert.equal(a.store.has(PROGRESS_KEY), false);
+  a.seed();
+  const q = makeQuestion("math-mix", 4, "smoke", 0);
+  a.answer(q.answer);
+  const summary = JSON.parse(a.store.get(PROGRESS_KEY));
+  assert.equal(summary.apps["think-forge"].completed, 1);
+  assert.equal(summary.apps["think-forge"].total, 48);
+  assert.deepEqual(Object.keys(summary.apps["think-forge"]).sort(), ["completed", "total", "updatedAt"]);
+  a.seed(); a.answer(q.answer);
+  assert.equal(a.record().achievements.families.length, 1);
+  assert.equal(a.store.get(PROGRESS_KEY), JSON.stringify(summary));
+  a.el("next").click();
+  a.el("hint").click();
+  a.answer(makeQuestion("math-mix", 4, "smoke", 1).answer);
+  assert.equal(a.record().achievements.families.length, 1);
+  a.seed(); a.el("next").click();
+  assert.equal(a.store.get(PROGRESS_KEY), JSON.stringify(summary));
+});
+
+test("DOM double: old XP does not invent achievements; runtime cap/export/own-only deletion", async (t) => {
+  const a = await app(t, { xp: 1e9, correct: 99, answered: 99, topics: {}, mistakes: [] });
+  assert.equal(a.el("independent-count").textContent, "0 / 48");
+  a.store.set(PROGRESS_KEY, JSON.stringify({ version: 1, apps: {
+    "light-route": { completed: 3, total: 8, updatedAt: "2026-10-09T00:00:00.000Z" },
+  } }));
+  a.seed(); a.answer(makeQuestion("math-mix", 4, "smoke", 0).answer);
+  assert.equal(a.record().xp, 1e9);
+  assert.equal(a.record().achievements.families.length, 1);
+  a.el("export").click();
+  assert.equal((await a.exported()).record.xp, 1e9);
+  a.el("clear").click();
+  assert.equal(a.record().xp, 0);
+  const apps = JSON.parse(a.store.get(PROGRESS_KEY)).apps;
+  assert.equal(Object.hasOwn(apps, "think-forge"), false);
+  assert.equal(apps["light-route"].completed, 3);
+});
+
+test("DOM double: durable evidence reloads, private storage failure cannot publish completion", async (t) => {
+  const q = makeQuestion("math-mix", 4, "smoke", 0);
+  const evidence = recordAttempt(null, q, { correct: true });
+  const a = await app(t, { xp: 22, correct: 1, answered: 1, topics: {}, mistakes: [], achievements: evidence });
+  assert.equal(a.el("independent-count").textContent, "1 / 48");
+  assert.equal(a.store.has(PROGRESS_KEY), false, "loading evidence is not a new completion");
+  a.el("hint").click();
+  assert.equal(a.store.has(PROGRESS_KEY), false, "hint cannot create an aggregate even with old achievements");
+  globalThis.localStorage.setItem = (key) => { if (key === "think-forge-v1") throw Error("quota"); };
+  a.seed(); a.answer(q.answer);
+  assert.equal(a.store.has(PROGRESS_KEY), false);
+  assert.match(a.el("notice").textContent, /저장할 수 없습니다/);
+  assert.equal(a.el("next").hidden, false);
+});
+
+test("DOM double: opening an unsubmitted exam solution blocks subsequent completion of its conditions", async (t) => {
+  const a = await app(t);
+  a.topic("calculus"); a.mode("challenge"); a.seed();
+  const q = makeQuestion("calculus", 4, "smoke", 0);
+  a.advance(40 * 60000 + 1); a.tick();
+  assert.equal(a.record(), null, "timeout itself earns nothing and creates no attempt");
+  const first = a.el("session-result").children.find((el) => el.tagName === "details");
+  first.open = true;
+  first.ontoggle();
+  assert.equal(a.record().answered, 0);
+  assert.equal(a.record().xp, 0);
+  assert.equal(a.record().mistakes.length, 0);
+  assert.equal(a.record().achievements.seen.length, 1);
+  a.mode("learn"); a.seed(); a.answer(q.answer);
+  assert.equal(a.record().correct, 1);
+  assert.equal(a.record().achievements.families.length, 0);
+  assert.equal(a.store.has(PROGRESS_KEY), false);
 });

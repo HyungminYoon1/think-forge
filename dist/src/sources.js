@@ -3,8 +3,7 @@ export const ORIGINAL = Object.freeze({
   kind: "original",
   creator: "THINK FORGE",
   title: "자체 제작 연습문항",
-  notice:
-    "수능형 다단계 추론 / 대학 전공 연습용. 실제 수능 기출·공식 평가 문항이 아닙니다.",
+  notice: "수학·컴퓨터과학 연습문항.",
 });
 const base = "https://ocw.mit.edu/courses/";
 export function source(course, question, changes) {
