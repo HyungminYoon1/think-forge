@@ -21,6 +21,7 @@ import {
 import { reasoningCriteria, scoreReasoning } from "./reasoning.js";
 import { loadAchievements, recordAttempt, COMPLETION_TOTAL, EVIDENCE_LIMIT } from "./achievements.js";
 import { reportProgress, clearProgress } from "./progress.js";
+import { TRANSFER } from "./transfer.js";
 const KEY = "think-forge-v1";
 const blank = () => ({
   xp: 0,
@@ -68,8 +69,9 @@ function persist({ summarize = false } = {}) {
     announce("기록을 저장할 수 없습니다. 이번 세션은 계속 진행할 수 있습니다.");
     return false;
   }
-  if (summarize && record.achievements.families.length)
-    reportProgress(record.achievements.families.length, COMPLETION_TOTAL);
+  if (summarize && record.achievements.families.length &&
+      !reportProgress(record.achievements.families.length, COMPLETION_TOTAL))
+    announce("학습 기록은 저장했지만 갤러리 요약을 갱신하지 못했습니다. 기록 내보내기는 사용할 수 있습니다.");
   return true;
 }
 function topics() {
@@ -340,6 +342,27 @@ function provenance(container, question) {
     container.append(a);
   }
 }
+function transferTask(question) {
+  const task = TRANSFER[question.topic];
+  if (!task) return null;
+  const details = document.createElement("details"), summary = document.createElement("summary"),
+    prompt = document.createElement("p"), solution = document.createElement("details"),
+    label = document.createElement("summary"), list = document.createElement("ol");
+  details.className = "transfer-task";
+  summary.textContent = "조건을 바꿔 생각하기 · " + task.title;
+  prompt.textContent = task.prompt;
+  label.textContent = "내 설명과 비교하기";
+  for (const text of task.rubric) {
+    const li = document.createElement("li"); li.textContent = text; list.append(li);
+  }
+  solution.append(label, list);
+  if (task.source) {
+    const a = document.createElement("a"); a.textContent = "개념 원문 ↗";
+    a.href = task.source; a.target = "_blank"; a.rel = "noopener noreferrer"; solution.append(a);
+  }
+  details.append(summary, prompt, solution);
+  return details;
+}
 function show() {
   answered = false;
   hintIndex = 0;
@@ -400,6 +423,7 @@ function show() {
   $("hint").disabled = mode === "challenge";
   $("hint-panel").hidden = true;
   $("explanation").hidden = true;
+  $("transfer").replaceChildren();
   $("session-result").hidden = true;
   $("question").hidden = false;
   $("feedback").className = "feedback";
@@ -491,6 +515,10 @@ function answer(value) {
     ),
   );
   $("explanation").hidden = mode === "challenge";
+  if (mode !== "challenge") {
+    const task = transferTask(current);
+    if (task) $("transfer").append(task);
+  }
   stats();
   $("progress").style.width =
     (mode === "challenge" ? session.total * 10 : 0) + "%";
@@ -562,6 +590,8 @@ function finish(title) {
       const analysis = document.createElement("div");
       if (entry.reasoning) reasoningFeedback(entry.reasoning, analysis);
       details.append(summary, text, diagram, result, analysis, steps, credit);
+      const task = transferTask(entry.question);
+      if (task) details.append(task);
       details.ontoggle = () => {
         if (!details.open) return;
         record.achievements = recordAttempt(record.achievements, entry.question, { aided: true });

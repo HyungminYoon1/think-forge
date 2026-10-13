@@ -1,5 +1,17 @@
 # 검증 기록
 
+## 2026-10-13 자동 구현 — 통합 인계
+
+- SOURCE VERIFIED: architecture.md, README.md, docs/decisions.md, 사용자 제공 AGENTS, .gitattributes/package.json, app/core/bank/progress 및 변경한 transfer/index/styles/test를 전체 확인했습니다. api-spec.md/requirements.md/저장소 AGENTS.md는 없습니다. 저장소 전체는 PARTIAL: 파일 목록을 확인한 뒤 위 학습·저장/UI 경로를 선택했고 v1/v2 전체 문제군은 기존 독립 오라클로 검증했습니다. 변경하지 않는 모든 보조 문서·workflow·그림의 전체 내용 검토로 표현하지 않습니다. 미지정 저장소는 소유 범위 밖입니다.
+- BUG: 개인 성취 저장 성공 뒤 갤러리 요약 쓰기 실패가 안내되지 않았습니다. 먼저 추가한 DOM 회귀 테스트가 notice=''로 실패했고, 수정 후 개인 증거/형제 요약 보존과 부분 실패 안내가 통과했습니다. 실제 격리 Chromium에서도 요약 쓰기만 실패시켜 privateSaved=true, summaryPreserved=true를 확인했습니다.
+- CONTENT/UI: 기존 은행/seed/오답/48완료 의미를 유지하고 10개 자체 반례·조건 도전과 3항목 자기 점검 해설을 추가했습니다. 시험 진행 중은 숨기고 종료 복습에서 제공합니다. 이 활동은 저장·점수·자동 증명 채점이 없습니다. 출처 검토는 learning-provenance.md에 기록했습니다. UI change: YES.
+- LOCAL: npm test **91/91 PASS**, 실패/skip/todo 0; npm run check PASS. 기존 v1 2,240조건 지문·v2 3,840 결정성·2,304 독립 정답 조건·512 수치 중간값 검사 유지. 별도 .qa/qa-20261013/domain.mjs에서 행렬 반례, 두 사람 양화사, 경로 열거, 양방향 배낭 갱신, SQLite 실제 ON/WHERE, Git 조상 DAG 검산 PASS. SQLite 경고는 기존 Node 실험적 기능 안내이며 PostgreSQL 실행 증거가 아닙니다.
+- ACTUAL BROWSER: 별도 QA 세션, http://127.0.0.1:52047/think-forge/. 4단계 미적분/smoke/1296 Enter 제출, 빈 입력 거절, 10개 도전의 과제/해설, 펼치기 전후 개인 기록 동일, 잘못된 코드 후 문항 유지, 10문제 시험 종료 복습/진행 중 비공개, 실제 JSON 다운로드 PASS. 1440×1000 / 390×844 / 320×780에서 변경 패널의 페이지 가로 넘침 0, 관측한 page errors/console errors 0. 캡처를 직접 육안 확인했습니다.
+- CAPTURE/SELECTORS: ignored `.qa/qa-20261013/transfer-desktop.png`, `transfer-390.png`, `transfer-320.png`, `exam-review.png`, `partial-storage.png`. desktop은 정답 제출 후 `#transfer .transfer-task`와 안쪽 `details`를 펼친 상태입니다. 시험은 `#session-result > details`의 첫 항목과 `.transfer-task`가 열린 상태입니다. 스크립트/다운로드는 같은 ignored 디렉터리입니다.
+- CHANGED FILES: README.md, architecture.md, dist/index.html, dist/styles.css, dist/src/app.js, dist/src/transfer.js(new), test/app.test.js, docs/decisions.md, docs/learning-provenance.md(new), docs/verification.md. frozen questions/math-bank/cs-bank/출처 번안 파일·저장 스키마는 변경하지 않았습니다.
+- FINAL FILE CHECK: 변경 텍스트10개 UTF-8 no BOM/CRLF, git diff --check PASS. Node v22.23.2. QA 브라우저와 자체 서버만 종료했으며 메인 통합 서버는 유지했습니다.
+- LIMITS: Chromium 한 환경의 위 흐름만 확인했습니다. 실제 모바일 하드웨어·다른 브라우저·40분 실시간 대기·WebMCP·독립 교육 전문가 검토는 NOT_RUN. 교차 앱 갤러리 통합/새 미리보기/REMOTE_CI/LIVE/배포는 메인 담당자 작업입니다. 이 세션에서 커밋·푸시·배포·갤러리 편집·에이전트 생성은 하지 않았습니다.
+
 검증일: 2026-10-08 (KST). 증거 상태를 분리합니다.
 
 ## LOCAL — PASS

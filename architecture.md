@@ -5,6 +5,7 @@ Browser-only static GitHub Pages application. Public output is dist/ only.
 - dist/src/model.js (or questions.js): pure deterministic generation, validation, rules and scoring. No DOM/storage/network.
 - dist/src/bank.js: version routing, family selection and pure mistake identity/retention helpers; questions.js remains the frozen v1 generator. math-bank.js/cs-bank.js/exam-utils.js/sources.js contain pure v2 generation and provenance metadata. URLs are attribution links, not runtime fetches.
 - dist/src/reasoning.js: pure, optional numeric checkpoint criteria and one-point-per-checkpoint scoring for eight v2 families. Not free-text/proof grading; it does not change numeric answer scoring or XP.
+- dist/src/transfer.js: original, fixed counterexample/self-review prompts for ten topics. app.js reveals them after feedback (after finish in exams). No grading, completion, persistence, or seeded-bank changes.
 - dist/src/achievements.js: pure validation and transition of distinct independent family achievements, plus a bounded history of attempted/disclosed conditions. No DOM, clock, storage or network.
 - dist/src/app.js: DOM rendering, inputs and session lifecycle. Uses model functions; no DB or remote calls.
 - dist/src/core.js: seeded RNG, bounded input validation, feature-detected WebMCP, device-local storage helpers.

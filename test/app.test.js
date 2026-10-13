@@ -421,3 +421,41 @@ test("DOM double: opening an unsubmitted exam solution blocks subsequent complet
   assert.equal(a.record().achievements.families.length, 0);
   assert.equal(a.store.has(PROGRESS_KEY), false);
 });
+
+test("DOM double: failed gallery write reports partial persistence and keeps private evidence", async (t) => {
+  const a = await app(t);
+  const sibling = JSON.stringify({ version: 1, apps: {
+    "light-route": { completed: 3, total: 8, updatedAt: "2026-10-09T00:00:00.000Z" },
+  } });
+  a.store.set(PROGRESS_KEY, sibling);
+  globalThis.localStorage.setItem = (key, value) => {
+    if (key === PROGRESS_KEY) throw Error("quota");
+    a.store.set(key, value);
+  };
+  a.seed(); a.answer(makeQuestion("math-mix", 4, "smoke", 0).answer);
+  assert.equal(a.record().achievements.families.length, 1);
+  assert.equal(a.store.get(PROGRESS_KEY), sibling);
+  assert.match(a.el("notice").textContent, /학습 기록은 저장.*갤러리.*갱신하지 못/);
+  assert.equal(a.el("next").hidden, false);
+});
+
+test("DOM double: transfer tasks wait for feedback, stay outside records and reset on next", async (t) => {
+  const a = await app(t);
+  a.topic("calculus"); a.seed();
+  assert.equal(a.el("transfer").textContent, "");
+  a.answer(makeQuestion("calculus", 4, "smoke", 0).answer);
+  assert.match(a.el("transfer").textContent, /정지점과 최솟값/);
+  const before = JSON.stringify(a.record());
+  const task = a.el("transfer").children[0];
+  task.open = true;
+  assert.equal(JSON.stringify(a.record()), before);
+  a.el("next").click();
+  assert.equal(a.el("transfer").textContent, "");
+  a.mode("challenge"); a.seed();
+  a.answer(makeQuestion("calculus", 4, "smoke", 0).answer);
+  assert.equal(a.el("transfer").textContent, "");
+  a.advance(40 * 60000 + 1); a.tick();
+  assert.match(a.el("session-result").textContent, /정지점과 최솟값/);
+  a.el("export").click();
+  assert.equal(JSON.stringify(await a.exported()).includes('rubric'), false);
+});

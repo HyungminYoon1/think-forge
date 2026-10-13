@@ -659,3 +659,8 @@ footer {
     scroll-behavior: auto !important;
   }
 }
+.transfer-task { margin-top: 1.2rem; padding: 1rem; border: 1px solid var(--line); background: #fff; color: #17243b; }
+.transfer-task summary { cursor: pointer; font-weight: 600; line-height: 1.7; }
+.transfer-task p, .transfer-task li { line-height: 1.9; overflow-wrap: anywhere; }
+.transfer-task details { margin-top: 1rem; }
+.transfer-task a { font-size: .85rem; }
