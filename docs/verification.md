@@ -1,5 +1,9 @@
 # 검증 기록
 
+## 2026-10-13 systematic edge-case audit — LOCAL / parent integration
+
+[104/104 Node +4/4 browser; 13 new Node tests; 3 RED/GREEN bugs](edge-cases-20261013.md). Full feature/boundary matrix, exact executable test names, actual failures-before/fixes-after, source inventory and limitations are in that report. npm run check and git diff --check PASS after UTF-8/no-BOM/CRLF normalization. Current CI includes new Node tests; tools/edge-browser.mjs remains a repeatable manual Chrome harness. No commit/push/deploy or gallery/ranking change; REMOTE_CI/LIVE/public-byte verification belongs to the parent integration.
+
 ## 2026-10-13 자동 구현 — 통합 인계
 
 - SOURCE VERIFIED: architecture.md, README.md, docs/decisions.md, 사용자 제공 AGENTS, .gitattributes/package.json, app/core/bank/progress 및 변경한 transfer/index/styles/test를 전체 확인했습니다. api-spec.md/requirements.md/저장소 AGENTS.md는 없습니다. 저장소 전체는 PARTIAL: 파일 목록을 확인한 뒤 위 학습·저장/UI 경로를 선택했고 v1/v2 전체 문제군은 기존 독립 오라클로 검증했습니다. 변경하지 않는 모든 보조 문서·workflow·그림의 전체 내용 검토로 표현하지 않습니다. 미지정 저장소는 소유 범위 밖입니다.

@@ -64,6 +64,7 @@ let subject = "math",
   finished = false,
   reviewQueue = [],
   deadline = 0;
+let generation = 0;
 function persist({ summarize = false } = {}) {
   if (!saveLocal(KEY, record)) {
     announce("기록을 저장할 수 없습니다. 이번 세션은 계속 진행할 수 있습니다.");
@@ -149,6 +150,7 @@ function reasoningFeedback(score, container) {
   container.append(text, list);
 }
 function visual(v, el = $("question-visual")) {
+  const questionAtRender = current;
   el.replaceChildren();
   if (!v) return;
   if (v.type === "table") {
@@ -298,11 +300,11 @@ function visual(v, el = $("question-visual")) {
         role: "button",
         "aria-label": "점 " + point.value,
       });
-      dot.addEventListener("click", () => answer(point.value));
+      dot.addEventListener("click", () => { if (current === questionAtRender) answer(point.value); });
       dot.addEventListener("keydown", (event) => {
         if (["Enter", " "].includes(event.key)) {
           event.preventDefault();
-          answer(point.value);
+          if (!event.isComposing && current === questionAtRender) answer(point.value);
         }
       });
       item(
@@ -402,6 +404,7 @@ function show() {
   $("choices").replaceChildren();
   if (current.options)
     current.options.forEach((value, i) => {
+      const questionAtRender = current;
       const b = document.createElement("button");
       b.className = "choice";
       const n = document.createElement("strong"),
@@ -412,7 +415,7 @@ function show() {
           : String.fromCharCode(65 + i);
       s.textContent = value;
       b.append(n, s);
-      b.onclick = () => answer(value);
+      b.onclick = () => { if (current === questionAtRender) answer(value); };
       $("choices").append(b);
     });
   $("answer").value = "";
@@ -611,6 +614,7 @@ function finish(title) {
 }
 function start(nextSeed = seed) {
   const validatedSeed = cleanSeed(nextSeed);
+  const thisGeneration = ++generation;
   clearInterval(timer);
   timer = 0;
   seed = validatedSeed;
@@ -648,6 +652,7 @@ function start(nextSeed = seed) {
         : `${challengeMinutes(level)}:00`;
   if (mode === "challenge") {
     timer = setInterval(() => {
+      if (thisGeneration !== generation || mode !== "challenge" || finished) return;
       const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       $("session-label").textContent =
         String(Math.floor(seconds / 60)).padStart(2, "0") +
@@ -659,7 +664,7 @@ function start(nextSeed = seed) {
 }
 $("submit").onclick = () => answer($("answer").value);
 $("answer").onkeydown = (e) => {
-  if (e.key === "Enter") answer($("answer").value);
+  if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) answer($("answer").value);
 };
 $("skip").onclick = () => answer(null);
 $("next").onclick = () => {

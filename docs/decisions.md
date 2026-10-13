@@ -1,5 +1,14 @@
 # 결정 기록
 
+## D15 — Session-owned input callbacks / 2026-10-13
+
+- Context: the approved systematic edge audit reproduced premature IME scoring, a detached choice submitting a new question, and a cancelled challenge's queued timer ending learning.
+- Options: disable additional controls globally; change scoring/records; guard events by their owning question/session.
+- Decision: preserve bank/XP/record/retention contracts. Rendered choice and SVG callbacks capture the question; timers capture a generation incremented only after seed validation; composition/229 Enter does not submit.
+- Rationale: an event belongs to the condition that created it. Invalid seed entry must preserve the active session and timer.
+- Affected: dist/src/app.js, test/app.test.js, test/edge-cases.test.js, tools/edge-browser.mjs, docs/edge-cases-20261013.md and verification.
+- Follow-up: Node CI covers the failures; browser harness is manual. OS IME, real long expiry and atomic cross-tab storage remain untested. No architecture or storage policy change.
+
 ## D14 — 반례 도전과 저장 부분 실패 안내 / 2026-10-13
 
 - 맥락: 자동 구현 승인 범위에서 수치 변형을 넘어 조건·반례를 설명하는 학습을 보강합니다. 개인 성취 저장 뒤 공유 요약 실패가 안내되지 않는 경로도 재현했습니다.

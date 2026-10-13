@@ -459,3 +459,66 @@ test("DOM double: transfer tasks wait for feedback, stay outside records and res
   a.el("export").click();
   assert.equal(JSON.stringify(await a.exported()).includes('rubric'), false);
 });
+
+test("edge: IME confirmation Enter leaves the numeric attempt open", async (t) => {
+  const a = await app(t); a.topic("calculus"); a.seed();
+  a.el("answer").value = "1296";
+  a.el("answer").onkeydown({ key: "Enter", isComposing: true });
+  assert.equal(a.record(), null, "composition must not score before explicit submission");
+  a.el("answer").onkeydown({ key: "Enter", isComposing: false });
+  assert.equal(a.record().correct, 1);
+});
+
+test("edge: detached choice from an old question cannot answer the new question", async (t) => {
+  const a = await app(t); a.topic("algorithms"); a.seed();
+  const oldChoice = a.el("choices").children[0];
+  assert.ok(oldChoice, "choice fixture exists");
+  a.el("skip").click(); a.el("next").click();
+  const before = a.record(); oldChoice.click();
+  assert.deepEqual(a.record(), before, "late old choice must not submit a new condition");
+  assert.equal(a.el("submit").disabled, false);
+});
+
+test("edge: queued timer from cancelled challenge cannot finish a learning session", async (t) => {
+  const a = await app(t); a.mode("challenge");
+  const lateTick = [...a.intervals.values()][0];
+  a.mode("learn"); lateTick();
+  assert.equal(a.el("question").hidden, false, "old deadline callback must not close learning");
+  assert.equal(a.el("session-result").hidden, true);
+  assert.match(a.el("session-label").textContent, /학습 모드/);
+});
+
+test("edge: deadline equality, repeat ticks and repeated next remain terminal", async (t) => {
+  const a = await app(t); a.mode("challenge"); a.seed();
+  a.advance(40 * 60000); a.answer("1296");
+  const result = a.el("session-result").textContent;
+  a.tick(); a.el("next").click(); a.el("skip").click(); a.answer("0");
+  assert.equal(a.record(), null); assert.equal(a.el("session-result").textContent, result);
+  assert.equal(a.intervals.size, 0);
+});
+
+test("edge: invalid code preserves answered feedback and exam timer; rapid next advances once", async (t) => {
+  const a = await app(t); a.topic("calculus"); a.seed(); a.answer("1296");
+  const before = a.record(), title = a.el("question-text").textContent;
+  a.seed("bad code!"); assert.deepEqual(a.record(), before);
+  assert.equal(a.el("question-text").textContent, title);
+  assert.equal(a.el("next").hidden, false);
+  a.el("next").click(); a.el("next").click();
+  assert.match(a.el("question-number").textContent, /02$/);
+  a.mode("challenge"); const count = a.intervals.size;
+  a.seed("x".repeat(41)); assert.equal(a.intervals.size, count);
+});
+
+test("edge: cancelled clear and denied clear preserve durable own and sibling bytes", async (t) => {
+  const a = await app(t); a.topic("calculus"); a.seed(); a.answer("1296");
+  const privateBefore = a.store.get("think-forge-v1"), summaryBefore = a.store.get(PROGRESS_KEY);
+  globalThis.confirm = () => false; a.el("clear").click();
+  assert.equal(a.store.get("think-forge-v1"), privateBefore);
+  assert.equal(a.store.get(PROGRESS_KEY), summaryBefore);
+  globalThis.confirm = () => true;
+  globalThis.localStorage.setItem = () => { throw Error("quota fixture"); };
+  a.el("clear").click();
+  assert.equal(a.store.get("think-forge-v1"), privateBefore);
+  assert.equal(a.store.get(PROGRESS_KEY), summaryBefore);
+  assert.match(a.el("notice").textContent, /일부 기록/);
+});
